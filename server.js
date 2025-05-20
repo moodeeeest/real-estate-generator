@@ -27,49 +27,44 @@ app.post('/generate', upload.single('image'), async (req, res) => {
 
     const outputFileName = 'output/' + Date.now() + '-final.jpg';
 
-    // Start image editing with Sharp
-    const image = sharp(imagePath);
-
     const width = 1080;
     const height = 1350;
 
-    // Create black overlay buffer
-    const overlay = Buffer.from(
-      `<svg width="${width}" height="${height}">
-        <rect x="0" y="0" width="100%" height="100%" fill="black" fill-opacity="0.4"/>
-      </svg>`
-    );
+    const image = sharp(imagePath).resize(width, height);
 
-    // Text overlay as SVG
-    const textOverlay = Buffer.from(
-      `<svg width="${width}" height="${height}">
+    // SVG overlay layer with pills and text
+    const svgOverlay = Buffer.from(`
+      <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
         <style>
-          .title { fill: white; font-size: 100px; font-family: Times New Roman; }
-          .subtitle { fill: white; font-size: 45px; font-family: Century Gothic; }
-          .price { fill: white; font-size: 160px; font-family: Times New Roman; }
+          .pill { font-family: 'Montserrat'; font-weight: bold; font-style: italic; fill: white; }
+          .pill-dark { fill: #4c4c4c; }
         </style>
-        <text x="50%" y="330" text-anchor="middle" class="title">${district}</text>
-        <text x="50%" y="385" text-anchor="middle" class="subtitle">${location}</text>
-        <text x="50%" y="910" text-anchor="middle" class="subtitle">${rooms}</text>
-        <text x="50%" y="1050" text-anchor="middle" class="price">${price}</text>
-      </svg>`
-    );
+
+        <!-- Price pill (Top-left) -->
+        <rect x="20" y="40" rx="40" ry="40" width="360" height="90" fill="#0077ff" />
+        <text x="200" y="100" text-anchor="middle" font-size="55" class="pill">$ ${price}</text>
+
+        <!-- District pill (Bottom) -->
+        <rect x="20" y="1200" rx="40" ry="40" width="750" height="90" fill="#0077ff" />
+        <text x="395" y="1265" text-anchor="middle" font-size="50" class="pill">${district.toUpperCase()}</text>
+
+        <!-- Location pill (Underneath district) -->
+        <rect x="20" y="1295" rx="40" ry="40" width="600" height="60" fill="#e0e0e0" />
+        <text x="320" y="1338" text-anchor="middle" font-size="35" class="pill pill-dark">${location.toUpperCase()}</text>
+      </svg>
+    `);
 
     await image
-      .resize(width, height)
-      .composite([
-        { input: overlay, blend: 'over' },
-        { input: textOverlay, blend: 'over' }
-      ])
+      .composite([{ input: svgOverlay, blend: 'over' }])
       .toFile(outputFileName);
 
-    // Send the final image file as response
+    // Send the final image back
     res.sendFile(path.resolve(outputFileName));
 
-    // Optional: Clean up after sending
+    // Optional: cleanup
     setTimeout(() => {
-      fs.unlinkSync(imagePath);       // delete original uploaded photo
-      fs.unlinkSync(outputFileName);  // delete final image
+      fs.unlinkSync(imagePath);
+      fs.unlinkSync(outputFileName);
     }, 5000);
 
   } catch (err) {
