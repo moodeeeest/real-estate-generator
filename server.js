@@ -1,83 +1,52 @@
-const express = require('express');
-const multer = require('multer');
-const sharp = require('sharp');
-const fs = require('fs');
-const path = require('path');
+const svgOverlay = Buffer.from(`
+  <svg width="1080" height="1350" xmlns="http://www.w3.org/2000/svg">
+    <style>
+      .pill {
+        rx: 60;
+        ry: 60;
+      }
+      .price-pill {
+        fill: #0077ff;
+      }
+      .district-pill {
+        fill: #0077ff;
+      }
+      .location-pill {
+        fill: #f0f0f0;
+      }
+      .price-text {
+        fill: #ffffff;
+        font-size: 70px;
+        font-family: 'Montserrat';
+        font-weight: 700;
+        font-style: italic;
+      }
+      .district-text {
+        fill: #ffffff;
+        font-size: 60px;
+        font-family: 'Montserrat';
+        font-weight: 700;
+        font-style: italic;
+      }
+      .location-text {
+        fill: #4c4c4c;
+        font-size: 40px;
+        font-family: 'Montserrat';
+        font-weight: 700;
+        font-style: italic;
+      }
+    </style>
 
-const app = express();
-const port = process.env.PORT || 3000;
+    <!-- Price pill -->
+    <rect x="50" y="50" width="300" height="100" class="pill price-pill"/>
+    <text x="200" y="120" text-anchor="middle" class="price-text">$ ${price}</text>
 
-// Set up multer to save uploaded images into "uploads/" folder
-const storage = multer.diskStorage({
-  destination: 'uploads/',
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
-const upload = multer({ storage });
+    <!-- District pill (bottom) -->
+    <rect x="50" y="1200" width="600" height="90" class="pill district-pill"/>
+    <text x="350" y="1260" text-anchor="middle" class="district-text">${district}</text>
 
-// Middleware to allow JSON data
-app.use(express.json());
-
-// POST route to receive image + text data
-app.post('/generate', upload.single('image'), async (req, res) => {
-  try {
-    const { district, location, rooms, price } = req.body;
-    const imagePath = req.file.path;
-
-    const outputFileName = 'output/' + Date.now() + '-final.jpg';
-
-    // Start image editing with Sharp
-    const image = sharp(imagePath);
-
-    const width = 1080;
-    const height = 1350;
-
-    // Create black overlay buffer
-    const overlay = Buffer.from(
-      `<svg width="${width}" height="${height}">
-        <rect x="0" y="0" width="100%" height="100%" fill="black" fill-opacity="0.4"/>
-      </svg>`
-    );
-
-    // Text overlay as SVG
-    const textOverlay = Buffer.from(
-      `<svg width="${width}" height="${height}">
-        <style>
-          .title { fill: white; font-size: 100px; font-family: Times New Roman; }
-          .subtitle { fill: white; font-size: 45px; font-family: Century Gothic; }
-          .price { fill: white; font-size: 160px; font-family: Times New Roman; }
-        </style>
-        <text x="50%" y="330" text-anchor="middle" class="title">${district}</text>
-        <text x="50%" y="385" text-anchor="middle" class="subtitle">${location}</text>
-        <text x="50%" y="910" text-anchor="middle" class="subtitle">${rooms}</text>
-        <text x="50%" y="1050" text-anchor="middle" class="price">${price}</text>
-      </svg>`
-    );
-
-    await image
-      .resize(width, height)
-      .composite([
-        { input: overlay, blend: 'over' },
-        { input: textOverlay, blend: 'over' }
-      ])
-      .toFile(outputFileName);
-
-    // Send the final image file as response
-    res.sendFile(path.resolve(outputFileName));
-
-    // Optional: Clean up after sending
-    setTimeout(() => {
-      fs.unlinkSync(imagePath);       // delete original uploaded photo
-      fs.unlinkSync(outputFileName);  // delete final image
-    }, 5000);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Something went wrong.' });
-  }
-});
-
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
+    <!-- Location pill (under district) -->
+    <rect x="50" y="1290" width="500" height="70" class="pill location-pill"/>
+    <text x="300" y="1340" text-anchor="middle" class="location-text">${location}</text>
+  </svg>
+`);
